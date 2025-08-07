@@ -1,0 +1,15 @@
+
+{
+  "name": "taixiu-server",
+  "version": "1.0.0",
+  "description": "WebSocket + API tài xỉu",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "ws": "^8.13.0",
+    "axios": "^1.6.0"
+  }
+}

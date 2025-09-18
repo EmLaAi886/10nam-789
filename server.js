@@ -1,156 +1,186 @@
-const WebSocket = require('ws');
 const http = require('http');
-const url = require('url');
+const WebSocket = require('ws');
 
-const PORT = 10000;
+const PORT = process.env.PORT || 10000;
 
-// ================== Biến toàn cục ==================
 let latestResult = {
-  Ket_qua: "Chưa có kết quả",
+  id: "binhtool90",
+  id_phien: 0,
+  ket_qua: "Chưa có kết quả"
+};
+
+// Lưu lịch sử kết quả T/X tối đa 20 lần
+let patternHistory = "";
+
+// Thông tin phiên hiện tại
+let currentSessionInfo = {
   Phien: 0,
-  Tong: 0,
   Xuc_xac_1: 0,
   Xuc_xac_2: 0,
   Xuc_xac_3: 0,
-  Du_doan: "Chưa có dự đoán",
-  id: "binhkogay"
+  Tong: 0,
+  Ket_qua: "Chưa có",
+  Phien_hien_tai: 0,
+  Du_doan: "Chưa dự đoán"
+};
+
+function updatePatternHistory(result) {
+  if (patternHistory.length >= 20) {
+    patternHistory = patternHistory.slice(1);
+  }
+  patternHistory += result;
+}
+
+function predictNextFromPattern(history) {
+  if (history.length < 6) return "Chưa đủ dữ liệu dự đoán";
+  const lastChar = history[history.length - 1];
+  const predicted = lastChar === 't' ? 'x' : 't';
+  return predicted === 't' ? "Tài" : "Xỉu";
+}
+
+const WS_URL = "wss://websocket.atpman.net/websocket";
+const HEADERS = {
+  "Host": "websocket.atpman.net",
+  "Origin": "https://play.789club.sx",
+  "User-Agent": "Mozilla/5.0",
+  "Accept-Encoding": "gzip, deflate, br, zstd",
+  "Accept-Language": "vi-VN,vi;q=0.9",
+  "Pragma": "no-cache",
+  "Cache-Control": "no-cache"
 };
 
 let lastEventId = 19;
 
-// ================== WebSocket ==================
-const WS_URL = "wss://websocket.atpman.net/websocket";
-const HEADERS = {
-  'Host': 'websocket.atpman.net',
-  'Origin': 'https://play.789club.sx',
-  'User-Agent': 'Mozilla/5.0',
-  'Accept-Encoding': 'gzip, deflate, br, zstd',
-  'Accept-Language': 'vi-VN,vi;q=0.9',
-  'Pragma': 'no-cache',
-  'Cache-Control': 'no-cache'
-};
-
-// ----- Đăng nhập bằng tài khoản mới -----
 const LOGIN_MESSAGE = [
   1,
   "MiniGame",
-  "wanglin2019a",        // user mới
-  "WangFlang1",          // pass mới
+  "binhdepzai113",
+  "123321",
   {
-    "info": "{\"ipAddress\":\"113.185.47.3\",\"wsToken\":\"eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJnZW5kZXIiOjAsImNhblZpZXdTdGF0IjpmYWxzZSwiZGlzcGxheU5hbWUiOiJ3YW5nbGluOTE5MjkiLCJib3QiOjAsImlzTWVyY2hhbnQiOmZhbHNlLCJ2ZXJpZmllZEJhbmtBY2NvdW50IjpmYWxzZSwicGxheUV2ZW50TG9iYnkiOmZablNlLCJjdXN0b21lcklkIjo2MjYwNjIwNSwiYWZmSWQiOiJkZWZhdWx0IiwiYmFubmVkIjpmYWxzZSwiYnJhbmQiOiI3ODkuY2x1YiIsInRpbWVzdGFtcCI6MTc1ODEzMjUzNzYyMywibG9ja0dhbWVzIjpbXSwiYW1vdW50IjowLCJsb2NrQ2hhdCI6ZmFsc2UsInBob25lVmVyaWZpZWQiOmZhbHNlLCJpcEFkZHJlc3MiOiIxMTMuMTg1LjQ3LjMiLCJtdXRlIjpmYWxzZSwiYXZhdGFyIjoiaHR0cHM6Ly9hcGkueGV1aS5pby9pbWFnZXMvYXZhdGFyL2F2YXRhcl8xMy5wbmciLCJwbGF0Zm9ybUlkIjo1LCJ1c2VySWQiOiJjMTQ2ODVlMS1mOGExLTRlYTMtYmEwYS01Y2M4Yjc1NzczNjAiLCJyZWdUaW1lIjoxNzU4MTMyNDcyMDkzLCJwaG9uZSI6IiIsImRlcG9zaXQiOmZhbHNlLCJ1c2VybmFtZSI6IlM4X3dhbmdsaW4yMDE5YSJ9.FEtg0oB1mkGhpzSCPmO3k6q-U5O-MQqVwu4HjrBG1O0\",\"locale\":\"vi\",\"userId\":\"c14685e1-f8a1-4ea3-ba0a-5cc8b7577360\",\"username\":\"S8_wanglin2019a\",\"timestamp\":1758132537623,\"refreshToken\":\"70cb336ff95a46d292f16c4fafe0a973.a46444d78db54b44a0cc4e812f979db2\"}",
-    "signature": "261EECD1A140C46175B081A912CFBCCA1C78727084352D38F8A83FF7D9ED132DEA65B76F84C61465218DED52BA5D90C96807DF7FB48C90D8DDE133955A09C9FB09DA617FC9F19C1D9024B4381149BAC7C771379013FE4FF99924B4CCAD128021663FFF4809F9B141CC8B5CE8D5721EF87932805124D0349CFD3F923178156052"
+    "info": "{\"ipAddress\":\"116.110.42.48\",\"wsToken\":\"eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJnZW5kZXIiOjAsImNhblZpZXdTdGF0IjpmYWxzZSwiZGlzcGxheU5hbWUiOiJvaWRvaW9pMTIzIiwiYm90IjowLCJpc01lcmNoYW50IjpmYWxzZSwidmVyaWZpZWRCYW5rQWNjb3VudCI6ZmFsc2UsInBsYXlFdmVudExvYmJ5IjpmYWxzZSwiY3VzdG9tZXJJZCI6NjI2MTI5MjEsImFmZklkIjoiZTRjMzI2YzUtZmI2OS00Mjk4LThlNmItMzZiMDBlMjQ3MjUwIiwiYmFubmVkIjpmYWxzZSwiYnJhbmQiOiI3ODkuY2x1YiIsInRpbWVzdGFtcCI6MTc1ODE1MTI2OTQ4NiwibG9ja0dhbWVzIjpbXSwiYW1vdW50IjowLCJsb2NrQ2hhdCI6ZmFsc2UsInBob25lVmVyaWZpZWQiOmZhbHNlLCJpcEFkZHJlc3MiOiIxMTYuMTEwLjQyLjQ4IiwibXV0ZSI6ZmFsc2UsImF2YXRhciI6Imh0dHBzOi8vYXBpLnhldWkuaW8vaW1hZ2VzL2F2YXRhci9hdmF0YXJfMjQucG5nIiwicGxhdGZvcm1JZCI6NSwidXNlcklkIjoiZTRjMzI2YzUtZmI2OS00Mjk4LThlNmItMzZiMDBlMjQ3MjUwIiwicmVnVGltZSI6MTc1ODE1MTI2OTQ4MCwicGhvbmUiOiIiLCJkZXBvc2l0IjpmYWxzZSwidXNlcm5hbWUiOiJTOF9iaW5oZGVwemFpMTEzIn0.GRYovVURM2XH7fgewq_QJy7I6Xd9sfgWGtfEBHavzHE\",\"locale\":\"vi\",\"userId\":\"e4c326c5-fb69-4298-8e6b-36b00e247250\",\"username\":\"S8_binhdepzai113\",\"timestamp\":1758151269486,\"refreshToken\":\"65fd3201c9a04221b4deec8c07776402.cc32f7e5933b41e1856eaf04fa25062e\"}",
+    "signature": "2FCD740705D1A7BC6C669D9AA4F699A83B96D085EF021ECA8219B262A76BD84A492317A9B99A587DF510501982B58A307B60D00F75E746282E9F6E12EC6FF6BCBD57ADE86F74058CE5C1011643FAE544FAE01AD0676F9833EB65692A1A5493A36FA1312DC2B1CC329581482E90C763481550E358F96BEE2CCB96B2ED9754F4EB"
   }
 ];
 
-const SUBSCRIBE_TX_RESULT = [6, "MiniGame", "taixiuUnbalancedPlugin", {"cmd": 2000}];
-const SUBSCRIBE_LOBBY = [6, "MiniGame", "lobbyPlugin", {"cmd": 10001}];
-
-// Hàm tạo dự đoán ngẫu nhiên
-function generateDuDoan() {
-  const options = ["Tài", "Xỉu"];
-  return options[Math.floor(Math.random() * options.length)];
-}
+const SUBSCRIBE_TX_RESULT = [6, "MiniGame", "taixiuUnbalancedPlugin", { cmd: 2000 }];
+const SUBSCRIBE_LOBBY = [6, "MiniGame", "lobbyPlugin", { cmd: 10001 }];
+const GET_CURRENT_SESSION = [5, { "cmd": 2005, "sid": 0 }];
 
 function connectWebSocket() {
-  const ws = new WebSocket(WS_URL, {
-    headers: HEADERS
-  });
+  const ws = new WebSocket(WS_URL, { headers: HEADERS });
 
-  ws.on('open', function open() {
-    console.log('✅ Đã kết nối WebSocket');
+  ws.on('open', () => {
+    console.log("✅ Đã kết nối WebSocket");
+
     ws.send(JSON.stringify(LOGIN_MESSAGE));
-
-    // Gửi các message subscribe sau 1 giây
     setTimeout(() => {
       ws.send(JSON.stringify(SUBSCRIBE_TX_RESULT));
       ws.send(JSON.stringify(SUBSCRIBE_LOBBY));
+      // Lấy thông tin phiên hiện tại
+      ws.send(JSON.stringify(GET_CURRENT_SESSION));
     }, 1000);
 
-    // Ping định kỳ và gửi lại subscribe
-    setInterval(() => {
-      ws.send('2'); // ping
-      ws.send(JSON.stringify(SUBSCRIBE_TX_RESULT));
-      ws.send(JSON.stringify([7, "Simms", lastEventId, 0, {"id": 0}]));
-    }, 10000);
+    setInterval(() => ws.send("2"), 10000);
+    setInterval(() => ws.send(JSON.stringify(SUBSCRIBE_TX_RESULT)), 30000);
+    setInterval(() => ws.send(JSON.stringify([7, "Simms", lastEventId, 0, { id: 0 }])), 15000);
+    // Cập nhật thông tin phiên hiện tại mỗi 10 giây
+    setInterval(() => ws.send(JSON.stringify(GET_CURRENT_SESSION)), 10000);
   });
 
-  ws.on('message', function message(data) {
+  ws.on('message', (msg) => {
     try {
-      const parsedData = JSON.parse(data);
-      
-      if (Array.isArray(parsedData)) {
-        // Cập nhật lastEventId
-        if (parsedData.length >= 3 && parsedData[0] === 7 && parsedData[1] === "Simms" && typeof parsedData[2] === 'number') {
-          lastEventId = parsedData[2];
+      const data = JSON.parse(msg);
+
+      if (Array.isArray(data)) {
+        if (data[0] === 7 && data[1] === "Simms" && Number.isInteger(data[2])) {
+          lastEventId = data[2];
         }
 
-        // Xử lý dữ liệu kết quả Tài/Xỉu
-        if (typeof parsedData[1] === 'object' && parsedData[1].cmd === 2006) {
-          const sid = parsedData[1].sid;
-          const d1 = parsedData[1].d1;
-          const d2 = parsedData[1].d2;
-          const d3 = parsedData[1].d3;
+        // Xử lý thông tin phiên hiện tại (cmd 2005)
+        if (data[1]?.cmd === 2005) {
+          const sessionInfo = data[1];
+          currentSessionInfo = {
+            Phien: sessionInfo.sid || 0,
+            Xuc_xac_1: sessionInfo.d1 || 0,
+            Xuc_xac_2: sessionInfo.d2 || 0,
+            Xuc_xac_3: sessionInfo.d3 || 0,
+            Tong: (sessionInfo.d1 || 0) + (sessionInfo.d2 || 0) + (sessionInfo.d3 || 0),
+            Ket_qua: sessionInfo.result || "Chưa có",
+            Phien_hien_tai: sessionInfo.currentSid || 0,
+            Du_doan: predictNextFromPattern(patternHistory)
+          };
+          
+          console.log("📊 Thông tin phiên hiện tại:", currentSessionInfo);
+        }
+
+        // Xử lý kết quả mới (cmd 2006)
+        if (data[1]?.cmd === 2006) {
+          const { sid, d1, d2, d3 } = data[1];
           const tong = d1 + d2 + d3;
           const ketqua = tong >= 11 ? "Tài" : "Xỉu";
-          
-          // Tạo dự đoán cho phiên tiếp theo
-          const du_doan = generateDuDoan();
 
           latestResult = {
-            Ket_qua: ketqua,
-            Phien: sid,
-            Tong: tong,
-            Xuc_xac_1: d1,
-            Xuc_xac_2: d2,
-            Xuc_xac_3: d3,
-            Du_doan: du_doan,
-            id: "binhkogay"
+            id: "binhtool90",
+            id_phien: sid,
+            ket_qua: `${d1}-${d2}-${d3} = ${tong} (${ketqua})`
           };
 
-          console.log('🎲 Cập nhật:', latestResult);
+          const resultTX = ketqua === "Tài" ? 't' : 'x';
+          updatePatternHistory(resultTX);
+
+          // Cập nhật dự đoán cho phiên hiện tại
+          currentSessionInfo.Du_doan = predictNextFromPattern(patternHistory);
+
+          console.log(latestResult);
+          console.log("🔮 Dự đoán pattern tiếp theo:", currentSessionInfo.Du_doan);
+          
+          // Lấy lại thông tin phiên hiện tại sau khi có kết quả mới
+          setTimeout(() => ws.send(JSON.stringify(GET_CURRENT_SESSION)), 1000);
         }
       }
-    } catch (e) {
-      console.log('❌ Lỗi message:', e.message);
+    } catch (err) {
+      console.error("❌ Lỗi message:", err.message);
     }
   });
 
-  ws.on('close', function close() {
-    console.log('🔌 WebSocket đóng. Kết nối lại sau 5s...');
+  ws.on('close', () => {
+    console.log("🔌 WebSocket đóng. Kết nối lại sau 5s...");
     setTimeout(connectWebSocket, 5000);
   });
 
-  ws.on('error', function error(err) {
-    console.log('❌ Lỗi WebSocket:', err.message);
+  ws.on('error', (err) => {
+    console.error("❌ Lỗi WebSocket:", err.message);
   });
 }
 
-// ================== HTTP SERVER ==================
+// ✅ HTTP server có cấu hình CORS CHO DOMAIN CỤ THỂ
 const server = http.createServer((req, res) => {
-  const parsedUrl = url.parse(req.url, true);
-  
-  // Xử lý CORS
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  // Chỉ cho phép domain sau truy cập:
+  res.setHeader("Access-Control-Allow-Origin", "http://tooltxsieuvip.site");
+  res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
-  if (req.method === 'OPTIONS') {
+  if (req.method === "OPTIONS") {
     res.writeHead(204);
     res.end();
     return;
   }
 
-  if (parsedUrl.pathname === '/taixiu' && req.method === 'GET') {
-    res.setHeader('Content-Type', 'application/json');
-    res.writeHead(200);
-    res.end(JSON.stringify(latestResult));
+  if (req.url === "/taixiu") {
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({
+      latestResult,
+      patternHistory,
+      duDoanPattern: predictNextFromPattern(patternHistory),
+      currentSession: currentSessionInfo
+    }));
   } else {
-    res.writeHead(404);
-    res.end('Khong tim thay');
+    res.writeHead(404, { "Content-Type": "text/plain" });
+    res.end("Không tìm thấy");
   }
 });
 
-// ================== RUN ==================
-console.log(`🌐 HTTP Server chạy tại http://localhost:${PORT}/taixiu`);
-server.listen(PORT);
-connectWebSocket();
+server.listen(PORT, () => {
+  console.log(`🌐 Server đang chạy tại http://localhost:${PORT}`);
+  connectWebSocket();
+});

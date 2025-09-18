@@ -1,15 +1,16 @@
 
 {
-  "name": "taixiu-server",
+  "name": "taixiu-websocket-server",
   "version": "1.0.0",
-  "description": "WebSocket + API tài xỉu",
+  "description": "Server nhận kết quả Tài Xỉu qua WebSocket và cung cấp API HTTP",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
   },
   "dependencies": {
-    "express": "^4.18.2",
-    "ws": "^8.13.0",
-    "axios": "^1.6.0"
-  }
+    "ws": "^8.14.2"
+  },
+  "keywords": ["websocket", "tai-xiu", "api"],
+  "author": "Your Name",
+  "license": "MIT"
 }
